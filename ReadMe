@@ -1,0 +1,1 @@
+To run mlp-gan.py or cgan.py with load_model function please make sure to create a folder named 'saved_model' and 'cgan_saved_model' in the working directory where the models can be stored.
