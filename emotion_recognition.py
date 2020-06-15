@@ -17,13 +17,35 @@ from numpy import asarray
 from keras.layers import Dense
 from keras.layers import Dropout
 from random import shuffle
+from collections import Counter
 
 def train_network():
     """ Train a Neural Network to classify music """
 
     # Convert notes into numerical input
     dirs = ["love_simple/*.mid", "anger_simple/*.mid"]
-    X_train, y_train = prepare_full_input(dirs)
+    dir_count = 0
+    all_notes = []
+    notes = []
+    n_dirs = []
+    for dir in dirs:
+        # Safe notes for each dir seperately
+        notes.append(get_notes(dir))
+    print(len(notes))
+    for single_dir_notes in notes:
+        # All notes
+        for note in single_dir_notes:
+            all_notes.append(note)
+        n_dirs.append(dir_count)
+        dir_count += 1
+    print("len all notes", len(all_notes))
+    print(all_notes)
+    n_all_vocabs = len(set(all_notes))
+    print("len notes", len(notes))
+    print("n dirs",n_dirs)
+    print("n all vocabs", n_all_vocabs)
+    #X_train = sequences, y_train = labels
+    X_train, y_train = prepare_sequences(notes, all_notes, n_all_vocabs, n_dirs)
 
 
     # Set up the model
@@ -31,7 +53,7 @@ def train_network():
     model = create_classifier(X_train, y_train)
     model.summary()
     # (2/4). hier #Epochen ändern
-    n_epochs = 500
+    n_epochs = 10
     #    #########
     # Create Checkpoint and Fit the model
     filepath = "weights-improvement-{epoch:02d}-{loss:.4f}-bigger.hdf5"
@@ -42,11 +64,11 @@ def train_network():
         save_best_only=True,
         mode='min',
         # (3/4). hier Häufigkeit der Gewichtespeicherung verändern
-        period=30
+        period=100
     )
     callbacks_list = [checkpoint]
     # (4/4).
-    history = model.fit(X_train, y_train, callbacks=callbacks_list, epochs=n_epochs, batch_size=64)
+    history = model.fit(X_train, y_train, callbacks=callbacks_list, epochs=n_epochs, batch_size=32)
     # 5. ggf noch load weights einkommentieren
     #########
 
@@ -57,8 +79,9 @@ def train_network():
     plt.close()
 
     # Evaluate
-    #gan_test, gan_label = prepare_gan_output(['cgan_final_0_2000_big_corpus.mid','cgan_final_1_2000_big_corpus.mid'], [0,1])
-    gan_test, gan_label = prepare_gan_output(['outputs\love_midi_by_lstm_75_epochs.mid', 'outputs\\anger_midi_by_lstm_80_epochs.mid'], [0, 1])
+    #gan_test, gan_label = prepare_gan_output(['cgan_final_0_2000_big_corpus.mid','cgan_final_1_2000_big_corpus.mid'], [0,1], all_notes)
+    #gan_test, gan_label = prepare_gan_output(['outputs\love_midi_by_lstm_75_epochs.mid', 'outputs\\anger_midi_by_lstm_80_epochs.mid'], [0, 1],all_notes)
+    gan_test, gan_label = prepare_gan_output(['love_simple\grease_medley_piob_15.mid','anger_simple\Jaws_piob_35.mid'], [0,1], all_notes)
     eval_loss, eval_acc = model.evaluate(gan_test,gan_label)
     print("Model accuracy: %.2f" %eval_acc)
 
@@ -73,7 +96,7 @@ def train_network():
 
 
 """ method prepares two midi output files taken from GAN or CGAN to test the model"""
-def prepare_gan_output(files, label_numbers):
+def prepare_gan_output(files, label_numbers, all_notes):
     notes = []
     len_notes = []
     for file in files:
@@ -101,7 +124,7 @@ def prepare_gan_output(files, label_numbers):
     sequence_length = 80
 
     # Get all pitch names
-    pitchnames = sorted(set(item for item in notes))
+    pitchnames = sorted(set(item for item in all_notes))
     print("pitchnames",pitchnames)
 
     # Create a dictionary to map pitches to integers
@@ -144,6 +167,7 @@ def prepare_gan_output(files, label_numbers):
     print("network input new", network_input)
     print("nework_input length", len(network_input))
     print("network output new", label)
+
     print("network output length", len(label))
 
     # n_patterns = len(network_input)
@@ -214,64 +238,31 @@ def get_notes(dir="love_simple/*.mid"):
 
     return notes
 
-def prepare_sequences(notes, n_vocab, label_number=0):
+def prepare_sequences(notes, all_notes, n_all_vocabs, n_dirs):
     """ Prepare the sequences used by the Neural Network """
+
     sequence_length = 80
 
     # Get all pitch names
-    pitchnames = sorted(set(item for item in notes))
+    pitchnames = sorted(set(item for item in all_notes))
 
     # Create a dictionary to map pitches to integers
     note_to_int = dict((note, number) for number, note in enumerate(pitchnames))
 
     network_input = []
-
-    # create input sequences and the corresponding outputs
-    for i in range(0, len(notes) - sequence_length, 1):
-        sequence_in = notes[i:i + sequence_length]
-        network_input.append([note_to_int[char] for char in sequence_in])
-
-    n_patterns = len(network_input)
-
-    # Reshape the input into a format compatible with LSTM layers
-    #network_input = np.reshape(network_input, (n_patterns, sequence_length, 1))
-    network_input = asarray(network_input)
-    # Normalize input between 0 and 1
-    network_input = network_input / float(n_vocab)
-    #network_output = np_utils.to_categorical(network_output)
-
     label = []
-    for i in range(0, n_patterns):
-        label.append(label_number)
-    #print("network_input", network_input)
-    print(len(label))
-    print("label in prepare sequences",label)
-
-
-    # Versuch ohne eckige Klammern
-    return (network_input, label)
-
-def prepare_full_input(dirs):
-    dir_count = 0
-    X_train = []
-    y_train = []
-    for dir in dirs:
-        notes = get_notes(dir)
-        n_vocab = len(set(notes))
-        ### hier labels mit übergeben
-        X_train_part, y_train_part = prepare_sequences(notes, n_vocab, dir_count)
-        dir_count += 1
-        for xt in X_train_part:
-            X_train.append(xt)
-        ### label einzeln anhängen
-        for l in y_train_part:
-            y_train.append(l)
+    for l in range (0, len(notes)):
+        # create input sequences
+        for i in range(0, len(notes[l]) - sequence_length, 1):
+            sequence_in = notes[l][i:i + sequence_length]
+            network_input.append([note_to_int[char] for char in sequence_in])
+            label.append(n_dirs[l])
 
     ##### NEW #####
     X_y_train = []
     # Prepare for shuffle
-    for i in range(0, len(X_train)):
-        X_y_train.append((X_train[i], y_train[i]))
+    for i in range(0, len(network_input)):
+        X_y_train.append((network_input[i], label[i]))
     print("network in out before shuffle", X_y_train)
     print(len(X_y_train))
     # Shuffle
@@ -279,28 +270,28 @@ def prepare_full_input(dirs):
     print("n i o after shuffle", X_y_train)
     print(len(X_y_train))
     # Seperate lists
-    X_train.clear()
-    y_train.clear()
+    network_input.clear()
+    label.clear()
     for row in X_y_train:
-        X_train.append(row[0])
-        y_train.append(row[1])
-    #print("X train new", X_train)
-    print("X train length", len(X_train))
-    print("y train new", y_train)
-    print("y train length", len(y_train))
+        network_input.append(row[0])
+        label.append(row[1])
+    # print("X train new", X_train)
+    print("X train length", len(network_input))
+    print("y train new", label)
+    print("y train length", len(label))
     ##### NEW end ####
+    print(Counter(label))
 
     # Reshape the input into a format compatible with LSTM layers
-    sequence_length = 80
-    X_train = np.reshape(X_train, (len(y_train), sequence_length, 1))
-    print("X_train", X_train)
-    print("len X train", len(X_train))
-    y_train = np.reshape(y_train, (len(y_train)))
-    y_train = np_utils.to_categorical(y_train)
-    #print("y_train", y_train)
-    #print("len y train", len(y_train))
+    network_input = np.reshape(network_input, (len(network_input), sequence_length, 1))
+    # Normalize input between 0 and 1
+    network_input = network_input / float(n_all_vocabs)
 
-    return X_train,y_train
+    label = np_utils.to_categorical(label)
+
+
+    # Versuch ohne eckige Klammern
+    return (network_input, label)
 
 if __name__ == '__main__':
    train_network()
