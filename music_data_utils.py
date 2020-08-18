@@ -1,3 +1,4 @@
+#Original Source: https://github.com/olofmogren/c-rnn-gan
 try:
     from urllib.parse import urlparse
 except ImportError:
@@ -48,132 +49,50 @@ class MusicDataLoader(object):
         try:
             # midi_pattern = midi.read_midifile(os.path.join(path, filename))
             midi_pattern = midi.read_midifile(filename)
-            print("midipattern after reading", midi_pattern)
             print(('Reading {}'.format(filename)))
-            print("tracks in midi_pattern", len(midi_pattern))
+            print("Tracks in midi_pattern", len(midi_pattern))
         except:
             print('Error reading {}'.format(filename))
             return None
-        #
-        # Interpreting the midi pattern.
-        # A pattern has a list of tracks
-        # (midi.Track()).
-        # Each track is a list of events:
-        #   * midi.events.SetTempoEvent: tick, data([int, int, int])
-        #     (The three ints are really three bytes representing one integer.)
-        #   * midi.events.TimeSignatureEvent: tick, data([int, int, int, int])
-        #     (ignored)
-        #   * midi.events.KeySignatureEvent: tick, data([int, int])
-        #     (ignored)
-        #   * midi.events.MarkerEvent: tick, text, data
-        #   * midi.events.PortEvent: tick(int), data
-        #   * midi.events.TrackNameEvent: tick(int), text(string), data([ints])
-        #   * midi.events.ProgramChangeEvent: tick, channel, data
-        #   * midi.events.ControlChangeEvent: tick, channel, data
-        #   * midi.events.PitchWheelEvent: tick, data(two bytes, 14 bits)
-        #
-        #   * midi.events.NoteOnEvent:  tick(int), channel(int), data([int,int]))
-        #     - data[0] is the note (0-127)
-        #     - data[1] is the velocity.
-        #     - if velocity is 0, this is equivalent of a midi.NoteOffEvent
-        #   * midi.events.NoteOffEvent: tick(int), channel(int), data([int,int]))
-        #
-        #   * midi.events.EndOfTrackEvent: tick(int), data()
-        #
-        # Ticks are relative.
-        #
-        # Tempo are in microseconds/quarter note.
-        #
-        # This interpretation was done after reading
-        # http://electronicmusic.wikia.com/wiki/Velocity
-        # http://faydoc.tripod.com/formats/mid.htm
-        # http://www.lastrayofhope.co.uk/2009/12/23/midi-delta-time-ticks-to-seconds/2/
-        # and looking at some files. It will hopefully be enough
-        # for the use in this project.
-        #
-        # We'll save the data intermediately with a dict representing each tone.
-        # The dicts we put into a list. Times are microseconds.
-        # Keys: 'freq', 'velocity', 'begin-tick', 'tick-length'
-        #
-        # 'Output ticks resolution' are fixed at a 32th note,
-        #   - so 8 ticks per quarter note.
-        #
-        # This approach means that we do not currently support
-        #   tempo change events.
-        #
-        # TODO 1: Figure out pitch.
-        # TODO 2: Figure out different channels and instruments.
-        #
-
         song_data = []
 
         # Tempo:
         ticks_per_quarter_note = float(midi_pattern.resolution)
-        print(('Resoluton: {}'.format(ticks_per_quarter_note)))
         input_ticks_per_output_tick = ticks_per_quarter_note / self.output_ticks_per_quarter_note
         # if debug == 'overfit': input_ticks_per_output_tick = 1.0
 
         # Multiply with output_ticks_pr_input_tick for output ticks.
-        for track in midi_pattern:
-            last_event_input_tick = 0
-            not_closed_notes = []
-            print("Length track", len(track))
-            for event in track:
-                if type(event) == midi.events.SetTempoEvent:
-                    #print("1 - TempoEvent")
-                    pass  # These are currently ignored
-                elif (type(event) == midi.events.NoteOffEvent) or \
-                        (type(event) == midi.events.NoteOnEvent and \
-                         event.velocity == 0):
-                    retained_not_closed_notes = []
-                    #print("length not_closed_notes2", len(not_closed_notes))
-                    for e in not_closed_notes:
-                        if tone_to_freq(event.data[0]) == e[FREQ]:
-                            #print("2a")
-                            print("...")
-                            print("Kümmern wir uns mal um die offenen Noten und geben ihnen eine Länge...")
-                            event_abs_tick = float(event.tick + last_event_input_tick) / input_ticks_per_output_tick
-                            print("event.tick", event.tick)
-                            print("last event input tick", last_event_input_tick)
-                            print("input ticks per output tick", input_ticks_per_output_tick)
-                            print("event_abs tick", event_abs_tick)
-                            # current_note['length'] = float(ticks*microseconds_per_tick)
-                            e[LENGTH] = event_abs_tick - e[BEGIN_TICK]
-                            song_data.append(e)
-                            print("note:",e)
-                        else:
-                            #print("2b")
-                            retained_not_closed_notes.append(e)
-                    # if len(not_closed_notes) == len(retained_not_closed_notes):
-                    #  print (('Warning. NoteOffEvent, but len(not_closed_notes)({}) == len(retained_not_closed_notes)({})'.format(len(not_closed_notes), len(retained_not_closed_notes)))
-                    #  print (('NoteOff: {}'.format(tone_to_freq(event.data[0])))
-                    #  print (('not closed: {}'.format(not_closed_notes))
-                    not_closed_notes = retained_not_closed_notes
-                elif type(event) == midi.events.NoteOnEvent:
-                    #print("3")
-                    begin_tick = float(event.tick + last_event_input_tick) / input_ticks_per_output_tick
-                    print("-------")
-                    print("(event.tick",event.tick,"+ last event input tick)", last_event_input_tick, "/input ticks per output tick", input_ticks_per_output_tick)
-                    note = [0.0] * (NUM_FEATURES_PER_TONE + 1)
-                    note[FREQ] = tone_to_freq(event.data[0])
-                    print("Note on Event auf Channel", event.channel)
-                    print("Note[FREQ] = ", note[FREQ])
-                    print("orginial tone before turned to frequency", event.data[0])
-                    note[VELOCITY] = float(event.data[1])
-                    print("NOTE[VELOCITY] = ", note[VELOCITY])
-                    note[BEGIN_TICK] = begin_tick
-                    print("NOTE[BEGIN_TICK] = ", begin_tick)
-                    not_closed_notes.append(note)
-                    print("neue not_closed_note: ",note)
-                    # not_closed_notes.append([0.0, tone_to_freq(event.data[0]), velocity, begin_tick, event.channel])
-                last_event_input_tick += event.tick
-            for e in not_closed_notes:
-                # print (('Warning: found no NoteOffEvent for this note. Will close it. {}'.format(e))
-                e[LENGTH] = float(ticks_per_quarter_note) / input_ticks_per_output_tick
-                song_data.append(e)
-                print("E", e)
-        print("Songdata unsorted", song_data)
-        print("Len unsorted data", len(song_data))
+        # --- only melody track = first track
+        track = midi_pattern[0]
+        last_event_input_tick = 0
+        not_closed_notes = []
+        for event in track:
+            if type(event) == midi.events.SetTempoEvent:
+                pass  # These are currently ignored
+            elif (type(event) == midi.events.NoteOffEvent) or \
+                    (type(event) == midi.events.NoteOnEvent and \
+                     event.velocity == 0):
+                retained_not_closed_notes = []
+                for e in not_closed_notes:
+                    if tone_to_freq(event.data[0]) == e[FREQ]:
+                        event_abs_tick = float(event.tick + last_event_input_tick) / input_ticks_per_output_tick
+                        e[LENGTH] = event_abs_tick - e[BEGIN_TICK]
+                        song_data.append(e)
+                    else:
+                        retained_not_closed_notes.append(e)
+                not_closed_notes = retained_not_closed_notes
+            elif type(event) == midi.events.NoteOnEvent:
+                begin_tick = float(event.tick + last_event_input_tick) / input_ticks_per_output_tick
+                note = [0.0] * (NUM_FEATURES_PER_TONE + 1)
+                note[FREQ] = tone_to_freq(event.data[0])
+                note[VELOCITY] = float(event.data[1])
+                note[BEGIN_TICK] = begin_tick
+                not_closed_notes.append(note)
+            last_event_input_tick += event.tick
+        for e in not_closed_notes:
+            # print (('Warning: found no NoteOffEvent for this note. Will close it. {}'.format(e))
+            e[LENGTH] = float(ticks_per_quarter_note) / input_ticks_per_output_tick
+            song_data.append(e)
         song_data.sort(key=lambda e: e[BEGIN_TICK])
         #Tempo Events
         if (pace_events):
@@ -184,9 +103,6 @@ class MusicDataLoader(object):
                 song_data.append([0.0, 440.0, 0.0, pace_tick, 0.0])
                 pace_tick += float(ticks_per_quarter_note) / input_ticks_per_output_tick
             song_data.sort(key=lambda e: e[BEGIN_TICK])
-
-        #print("song_data", song_data)
-        print("len s_d:", len(song_data))
         return song_data
 
     def get_midi_pattern(self, song_data):
@@ -199,48 +115,6 @@ class MusicDataLoader(object):
         returns the midi_pattern.
         Can be used with filename == None. Then nothing is saved, but only returned.
         """
-        # print (('song_data[0:10]: {}'.format(song_data[0:10])))
-
-        #
-        # Interpreting the midi pattern.
-        # A pattern has a list of tracks
-        # (midi.Track()).
-        # Each track is a list of events:
-        #   * midi.events.SetTempoEvent: tick, data([int, int, int])
-        #     (The three ints are really three bytes representing one integer.)
-        #   * midi.events.TimeSignatureEvent: tick, data([int, int, int, int])
-        #     (ignored)
-        #   * midi.events.KeySignatureEvent: tick, data([int, int])
-        #     (ignored)
-        #   * midi.events.MarkerEvent: tick, text, data
-        #   * midi.events.PortEvent: tick(int), data
-        #   * midi.events.TrackNameEvent: tick(int), text(string), data([ints])
-        #   * midi.events.ProgramChangeEvent: tick, channel, data
-        #   * midi.events.ControlChangeEvent: tick, channel, data
-        #   * midi.events.PitchWheelEvent: tick, data(two bytes, 14 bits)
-        #
-        #   * midi.events.NoteOnEvent:  tick(int), channel(int), data([int,int]))
-        #     - data[0] is the note (0-127)
-        #     - data[1] is the velocity.
-        #     - if velocity is 0, this is equivalent of a midi.NoteOffEvent
-        #   * midi.events.NoteOffEvent: tick(int), channel(int), data([int,int]))
-        #
-        #   * midi.events.EndOfTrackEvent: tick(int), data()
-        #
-        # Ticks are relative.
-        #
-        # Tempo are in microseconds/quarter note.
-        #
-        # This interpretation was done after reading
-        # http://electronicmusic.wikia.com/wiki/Velocity
-        # http://faydoc.tripod.com/formats/mid.htm
-        # http://www.lastrayofhope.co.uk/2009/12/23/midi-delta-time-ticks-to-seconds/2/
-        # and looking at some files. It will hopefully be enough
-        # for the use in this project.
-        #
-        # This approach means that we do not currently support
-        #   tempo change events.
-        #
 
         # Tempo:
         # Multiply with output_ticks_pr_input_tick for output ticks.
@@ -293,8 +167,6 @@ class MusicDataLoader(object):
 
         cur_track.append(midi.EndOfTrackEvent(tick=int(self.output_ticks_per_quarter_note)))
         midi_pattern.append(cur_track)
-        # print ( 'print (ing midi track.'
-        # print ( midi_pattern
         return midi_pattern
 
     def save_midi_pattern(self, filename, midi_pattern):
@@ -359,23 +231,19 @@ if __name__ == '__main__':
     print(('File: {}'.format(filename)))
     dl = MusicDataLoader(datadir=None, select_validation_percentage=0.0, select_test_percentage=0.0)
     abs_song_data = dl.read_one_file(filename=filename, pace_events=True)
-    print("----------")
 
     rel_song_data = []
     last_start = None
     for i, e in enumerate(abs_song_data):
         this_start = e[3]
-        #print("e[3]",e[3])
         if last_start:
             e[3] = e[3] - last_start
         rel_song_data.append(e)
-        #print("appending", e)
         last_start = this_start
-    print(rel_song_data)
-    print("len rel", len(rel_song_data))
     if not os.path.exists("newest_midi.mid"):
             print(('Saving: {}.'.format("new_midi.mid")))
-            #print midi pattern
+
+            # Print midi pattern
             print(dl.save_data("new_midi.mid", rel_song_data))
     else:
             print(('File already exists: {}. Not saving.'.format("new_midi")))

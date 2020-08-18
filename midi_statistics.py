@@ -1,3 +1,5 @@
+#Original Source: https://github.com/olofmogren/c-rnn-gan
+
 import sys, os, midi, math, string, time, glob
 
 import music_data_utils
@@ -248,14 +250,6 @@ def get_intensities(midi_pattern):
     return (min(intensities), max(intensities))
 
 
-# def get_midi_pattern(filename):
-#   try:
-#      return midi.read_midifile(filename)
-# except:
-#    print('Error reading {}'.format(filename))
-#   return None
-
-
 def tones_to_scales(tones):
     """
    Midi to tone name (octave: -5):
@@ -305,31 +299,22 @@ def repetitions(tones):
     rs = {}
     counter = {}
     prev_ton = []
-    print("rep, tones", tones)
-    #print("len tones / 2", len(tones) / 2)
-    for l in range(2, min(len(tones) // 2,10)): #2,10
-        #print("l", l)
+    for l in range(2, min(len(tones) // 2,10)):
         rs[l] = 0
         counter[l] = 0
         for i in range(len(tones) - l * 2):
             if tones[i:i + l] in prev_ton:
-                #print("pass")
-                #print(tones[i:i+l])
                 pass
             else:
                 for j in range(i + l, len(tones) - l):
-                    #print('comparing \'{}\' and \'{}\''.format(tones[i:i+l], tones[j:j+l]))
                     counter[l] += 1
                     if tones[i:i + l] == tones[j:j + l]:
-                        #print("counted")
                         rs[l] += 1
                         prev_ton.append(tones[i:i+l])
     rs2 = {}
     for r in rs:
         if rs[r]:
-            rs2[r] = rs[r]#/counter[r]
-            #print(counter[r])
-            #print(rs2[r])
+            rs2[r] = rs[r]
     return rs2
 
 
@@ -501,7 +486,9 @@ def save_stats_in_gnuplot_format(plots_dir, midi_dir):
     if not os.path.exists(os.path.join(plots_dir, 'gnuplot-commands-midistats.txt')):
         with open(os.path.join(plots_dir, 'gnuplot-commands-midistats.txt'), 'a') as f:
             f.write(
-                'set terminal postscript eps color butt "Times" 14\nset yrange [0:127]\nset xrange [0:70]\nset output "midistats.eps"\nplot \'midi_stats.gnuplot\' using ($1):(100*$3) title \'Scale consistency, %\' with linespoints, \'midi_stats.gnuplot\' using ($1):($6) title \'Tone span, halftones\' with linespoints, \'midi_stats.gnuplot\' using ($1):($10) title \'Unique tones\' with linespoints, \'midi_stats.gnuplot\' using ($1):($23) title \'Intensity span, units\' with linespoints, \'midi_stats.gnuplot\' using ($1):(100*$24) title \'Polyphony, %\' with linespoints, \'midi_stats.gnuplot\' using ($1):($12) title \'3-tone repetitions\' with linespoints\n')
+                #'set terminal postscript eps color butt "Times" 14\nset yrange [0:127]\nset xrange [0:20]\nset output "midistats.eps"\nplot \'midi_stats.gnuplot\' using ($1):(100*$3) title \'Scale consistency, %\' with linespoints, \'midi_stats.gnuplot\' using ($1):($6) title \'Tone span, halftones\' with linespoints, \'midi_stats.gnuplot\' using ($1):($10) title \'Unique tones\' with linespoints, \'midi_stats.gnuplot\' using ($1):($23) title \'Intensity span, units\' with linespoints, \'midi_stats.gnuplot\' using ($1):(100*$24) title \'Polyphony, %\' with linespoints, \'midi_stats.gnuplot\' using ($1):($12) title \'3-tone repetitions\' with linespoints\n')
+                'set terminal postscript eps color butt "Times" 14\nset yrange [0:400]\nset xrange [0:26]\nset output "midistats.eps"\nplot \'midi_stats.gnuplot\' using ($1):(100*$3) title \'Scale consistency, %\' with points ps 2, \'midi_stats.gnuplot\' using ($1):($6) title \'Tone span, halftones\' with points ps 2, \'midi_stats.gnuplot\' using ($1):($10) title \'Unique tones\' with points ps 2, \'midi_stats.gnuplot\' using ($1):($13) title \'4-tone-repetitions\' with points ps 2, \'midi_stats.gnuplot\' using ($1):($15) title \'6-tone repetitions\' with points ps 2, \'midi_stats.gnuplot\' using ($1):($17) title \'8-tone repetitions\' with points ps 2, \'midi_stats.gnuplot\' using ($1):($27) title \'Number of tones\' with points ps 2\n')
+
     try:
         Popen(['gnuplot', 'gnuplot-commands-midistats.txt'], cwd=plots_dir)
     except:
@@ -552,6 +539,9 @@ def save_stats_in_gnuplot_format(plots_dir, midi_dir):
             i += 1
 
         with open(statsfilename, 'a') as f:
+            # Get summary line and write it into file
+            f.write(get_gnuplot_line(patterns, len(patterns),showheader=False))
+            # Write all statistics as gnuplot_lines into file
             f.write(all_stats_string)
         print("Saved stats")
 
@@ -624,21 +614,14 @@ def print_stats(file_dir="", more_than_one=False, filename=""):
                 print('Top 2 interval difference: {}.'.format(stats['top_2_interval_difference']))
                 print('Top 3 interval difference: {}.'.format(stats['top_3_interval_difference']))
 
-
-
-
-
 #### MAIN METHOD STARTING HERE ###
-def main():
+if __name__ == "__main__":
     gnuplot = True
 
     """"""
     if gnuplot:
-        save_stats_in_gnuplot_format("plots", "love_obpi")
+        save_stats_in_gnuplot_format("plots", "anger_simple")
 
-    #show stats
+    # show stats
     else:
-        print_stats(filename="love_obpi/z_gan_4000_epochs_09.05..mid")
-
-if __name__ == "__main__":
-    main()
+        print_stats(filename="outputs/gan_love_obpi_1.0.mid")
