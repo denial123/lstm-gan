@@ -2,4 +2,4 @@ rnn.py and gan.py contain neural networks for generating music sequences. Output
 
 midi_statistics.py and music_data_utils.py create gnuplot statistics in an output file. Make sure to create folder "plots" in the directory before. To plot the gnuplot and save it as a file, use http://www.gnuplot.info/
 
-surprise.ipynb is a Jupyther Notebook to calculate Bayesian surprise on the generated sequences.
+surprise.ipynb is a Jupyter Notebook to calculate Bayesian surprise on the generated sequences.
