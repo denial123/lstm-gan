@@ -21,7 +21,8 @@ def get_notes():
     """ Get all the notes and chords from the midi files """
     notes = []
 
-    for file in glob.glob("love_obpi/*.mid"):
+    #hier zwischen love und anger wechseln
+    for file in glob.glob("love_simple/*.mid"):
         midi = converter.parse(file)
 
         print("Parsing %s" % file)
@@ -73,34 +74,6 @@ def prepare_sequences(notes, n_vocab):
 
     return (network_input, network_output)
 
-def generate_notes(model, network_input, n_vocab):
-    """ Generate notes from the neural network based on a sequence of notes """
-    # pick a random sequence from the input as a starting point for the prediction
-    start = numpy.random.randint(0, len(network_input)-1)
-    
-    # Get pitch names and store in a dictionary
-    pitchnames = sorted(set(item for item in notes))
-    int_to_note = dict((number, note) for number, note in enumerate(pitchnames))
-
-    pattern = network_input[start]
-    prediction_output = []
-
-    # generate 500 notes
-    for note_index in range(500):
-        prediction_input = numpy.reshape(pattern, (1, len(pattern), 1))
-        prediction_input = prediction_input / float(n_vocab)
-
-        prediction = model.predict(prediction_input, verbose=0)
-
-        index = numpy.argmax(prediction)
-        result = int_to_note[index]
-        prediction_output.append(result)
-        
-        pattern = numpy.append(pattern,index)
-        #pattern.append(index)
-        pattern = pattern[1:len(pattern)]
-
-    return prediction_output
   
 def create_midi(prediction_output, filename):
     """ convert the output from the prediction to notes and create a midi file
@@ -135,9 +108,10 @@ def create_midi(prediction_output, filename):
     midi_stream = stream.Stream(output_notes)
 
     midi_stream.show('text')
-    midi_stream.show()
-    # einkommentieren, um midi file zu speichern
-    # midi_stream.write('midi', fp='{}.mid'.format(filename))
+    #einkommentieren, um MuseScore zu öffnen
+    #midi_stream.show()
+    #einkommentieren, um midi file zu speichern
+    midi_stream.write('midi', fp='{}.mid'.format(filename))
 
 class GAN():
     def __init__(self, rows, load_model=False):
@@ -145,7 +119,11 @@ class GAN():
         self.seq_shape = (self.seq_length, 1)
         self.latent_dim = 1000
         self.disc_loss = []
-        self.gen_loss =[]
+        self.disc_loss_real = []
+        self.disc_loss_fake = []
+        self.gen_loss = []
+        self.d_acc_real = []
+        self.d_acc_fake = []
 
         self.model_save_dir = 'saved_model'
 
@@ -264,7 +242,7 @@ class GAN():
 
         #### muss noch auf den Server übertragen werden ##### 
         # One-sided label smoothing
-        real = np.full((batch_size, 1), 0.9)
+        #real = np.full((batch_size, 1), 0.9)
 
 
         # Training the model
@@ -300,16 +278,24 @@ class GAN():
 
             # Print the progress and save into loss lists
             if epoch % sample_interval == 0:
-              print ("%d [D loss: %f, acc.: %.2f%%] [G loss: %f]" % (epoch, d_loss[0], 100*d_loss[1], g_loss))
-              self.disc_loss.append(d_loss[0])
-              self.gen_loss.append(g_loss)
+                print("%d [D loss real: %f, acc. real: %.2f%%] [D loss fake: %f, acc. fake: %.2f%%] [G loss: %f]" % (
+                epoch, d_loss_real[0], 100 * d_loss_real[1], d_loss_fake[0], 100 * d_loss_fake[1], g_loss))
+                self.disc_loss.append(d_loss[0])
+                self.gen_loss.append(g_loss)
+                self.d_acc_real.append(100 * d_loss_real[1])
+                self.d_acc_fake.append(100 * d_loss_fake[1])
+                self.disc_loss_real.append(d_loss_real[0])
+                self.disc_loss_fake.append(d_loss_fake[0])
 
             #save models
             if epoch != 0 and epoch % model_save_interval == 0:
-                self.save_models()
+                #self.save_models()
+                self.plot_loss()
+                self.plot_accuracy()
 
         self.generate(notes)
         self.plot_loss()
+        self.plot_accuracy()
 
     #--------------- Source for saving the GAN model -----------------
     #github : "Added functionality to save/load Keras model for intermittent training"
@@ -376,15 +362,26 @@ class GAN():
 
         # create and save new midi file
         create_midi(pred_notes, 'gan_final')
-        
+
     def plot_loss(self):
-        plt.plot(self.disc_loss, c='red')
+        plt.plot(self.disc_loss_real, c='orange')
+        plt.plot(self.disc_loss_fake, c='green')
         plt.plot(self.gen_loss, c='blue')
-        plt.title("GAN Loss per Epoch")
-        plt.legend(['Discriminator', 'Generator'])
+        plt.title("CGAN Loss per Epoch")
+        plt.legend(['Discriminator real', 'Discriminator fake', 'Generator'])
         plt.xlabel('Epoch')
         plt.ylabel('Loss')
         plt.savefig('GAN_Loss_per_Epoch.png', transparent=True)
+        plt.close()
+
+    def plot_accuracy(self):
+        plt.plot(self.d_acc_real, c='orange')
+        plt.plot(self.d_acc_fake, c='green')
+        plt.title("GAN Accuracy")
+        plt.legend(['Acc real', 'Acc fake'])
+        plt.xlabel('Epoch')
+        plt.ylabel('Accuracy in %')
+        plt.savefig('GAN_Accuracy_per_Epoch.png', transparent=True)
         plt.close()
 
 if __name__ == '__main__':
@@ -397,7 +394,5 @@ if __name__ == '__main__':
   #mit Speicherung
   #---------------
   gan = GAN(rows=100, load_model=False)
-  gan.train(epochs=1, batch_size=32,
-            sample_interval=1, model_save_interval=6)
-
-###gleicher Stand wie auf Server
+  gan.train(epochs=3000, batch_size=32,
+            sample_interval=1, model_save_interval=100)
