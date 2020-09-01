@@ -1,5 +1,4 @@
 #%tensorflow_version 1.x
-#pylab inline
 import glob
 import numpy as np
 import pandas as pd
@@ -15,8 +14,6 @@ from keras.utils import np_utils
 from keras.callbacks import ModelCheckpoint
 from random import shuffle
 
-from google.colab import drive
-drive.mount('/content/drive')
 
 
 def train_network():
@@ -38,7 +35,7 @@ def train_network():
     n_epochs = 1
     #########
     # Create Checkpoint and Fit the model
-    filepath = "/content/drive/My Drive/Colab Notebooks/lstm-weights-3r/weights-anger_{epoch:02d}-{loss:.4f}.hdf5"
+    filepath = "weights-anger_{epoch:02d}-{loss:.4f}.hdf5"
     checkpoint = ModelCheckpoint(
         filepath,
         monitor='loss',
@@ -58,12 +55,12 @@ def train_network():
     # Use the model to generate a midi
     prediction_output = generate_notes(model, notes, network_input, len(set(notes)))
     # change between love and anger midi
-    create_midi(prediction_output, '/content/drive/My Drive/Colab Notebooks/lstm_anger/200_3r')
+    create_midi(prediction_output, 'RNN_evil_final_%d' %n_epochs)
 
     # Plot the model losses
     if history:
         pd.DataFrame(history.history).plot()
-        plt.savefig('/content/drive/My Drive/Colab Notebooks/lstm_anger/Loss_per_Epoch_for generation.png',
+        plt.savefig('RNN_Loss_per_Epoch.png',
                     transparent=True)
         plt.close()
 
@@ -72,7 +69,7 @@ def get_notes():
     """ Get all the notes and chords from the midi files """
     notes = []
 
-    for file in glob.glob("/content/drive/My Drive/Colab Notebooks/anger_simple/*.mid"):
+    for file in glob.glob("anger_simple/*.mid"): #change to love_simple for "good" data set
         midi = converter.parse(file)
 
         print("Parsing %s" % file)
@@ -155,8 +152,8 @@ def create_network(network_input, n_vocab):
     model.add(Dropout(0.3))
     model.add(Dense(n_vocab))
     model.add(Activation('softmax'))
-    # Uncomment to load weights
-    # model.load_weights("/content/drive/My Drive/Colab Notebooks/lstm-weights-3r/final-weights-anger_200-0.0068.hdf5")
+    # Uncomment to load weights and change name to respective weights file
+    # model.load_weights("final-weights-anger_200-0.0068.hdf5")
     model.compile(loss='categorical_crossentropy', optimizer='adam')
     print("Created model and loaded weights from file")
 
@@ -173,8 +170,6 @@ def generate_notes(model, notes, network_input, n_vocab):
     int_to_note = dict((number, note) for number, note in enumerate(pitchnames))
 
     pattern = network_input[start]
-    print("pattern:", pattern)
-    print("pattern len:", len(pattern))
     prediction_output = []
 
     # generate 300 notes
@@ -228,6 +223,7 @@ def create_midi(prediction_output, filename):
     # uncomment to show notes in Musescore
     # midi_stream.show()
     midi_stream.write('midi', fp='{}.mid'.format(filename))
+    print("Midi file saved.")
 
 
 if __name__ == '__main__':
