@@ -16,4 +16,8 @@ Requirements:
 + python3-midi (https://github.com/louisabraham/python3-midi) is used for feature extraction
 
 ##Bayesian surprise
-surprise.ipynb is a Jupyter Notebook to calculate Bayesian surprise on the generated sequences. You can calculate two different suprise value, one based on two-step transitions, one based on three-step transitions. One file at a time can be evaluated. Change file="" to load new file. 
+surprise.ipynb is a Jupyter Notebook to calculate Bayesian surprise on the generated sequences. You can calculate two different suprise value, one based on two-step transitions, one based on three-step transitions. One file at a time can be evaluated. Change file="" to load new file.
+
+## Data
+anger_simple contains midi files for training with "evil" emotions
+love_simple contains midi files for training with "good" emotions
