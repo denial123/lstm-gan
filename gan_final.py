@@ -19,15 +19,13 @@ from keras.utils.vis_utils import plot_model
 from numpy.random import random
 from random import shuffle, randint
 
-from google.colab import drive
-drive.mount('/content/drive')
 
 
 def get_notes():
     """ Get all the notes and chords from the midi files """
     notes = []
 
-    for file in glob.glob("/content/drive/My Drive/Colab Notebooks/love_simple/*.mid"):
+    for file in glob.glob("love_simple/*.mid"): # or anger_simple
         midi = converter.parse(file)
 
         print("Parsing %s" % file)
@@ -122,6 +120,7 @@ def create_midi(prediction_output, filename):
     # uncomment to open midi in MUSESCORE
     # midi_stream.show()
     midi_stream.write('midi', fp='{}.mid'.format(filename))
+    print("Midi file saved.")
 
 
 class GAN():
@@ -204,10 +203,6 @@ class GAN():
     # example of smoothing class=1 to [0.7, 1]
     def smooth_positive_labels(self, y):
         return y - 0.3 + (random(y.shape) * 0.3)
-
-    # example of smoothing class=0 to [0.0, 0.3]
-    #def smooth_negative_labels(self, y):
-    #   return y + random(y.shape) * 0.3
 
     def train(self, epochs, batch_size=128, sample_interval=50, update_plot_interval=50, repetition_disc=1,
               repetition_gen=1):
@@ -317,7 +312,7 @@ class GAN():
                 pred_after_transf.append(int_to_note[int(x)])
 
         # create and save new midi file
-        create_midi(pred_after_transf, '/content/drive/My Drive/Colab Notebooks/gan_love_4/10_%d' % epoch)
+        create_midi(pred_after_transf, 'gan_good_final_%d' % epoch)
 
     def plot_loss(self):
         """ plot disc and gen loss and save it to file """
@@ -328,7 +323,7 @@ class GAN():
         plt.legend(['Discriminator real', 'Discriminator fake', 'Generator'])
         plt.xlabel('Epoch')
         plt.ylabel('Loss')
-        plt.savefig('/content/drive/My Drive/Colab Notebooks/gan_love_4/10_GAN_Loss_per_Epoch.png', transparent=True)
+        plt.savefig('GAN_Loss_per_Epoch.png', transparent=True)
         plt.close()
 
     def plot_accuracy(self):
@@ -339,11 +334,12 @@ class GAN():
         plt.legend(['Acc real', 'Acc fake'])
         plt.xlabel('Epoch')
         plt.ylabel('Accuracy in %')
-        plt.savefig('/content/drive/My Drive/Colab Notebooks/gan_love_4/10_GAN_Accuracy_per_Epoch.png',
+        plt.savefig('GAN_Accuracy_per_Epoch.png',
                     transparent=True)
         plt.close()
 
 
 if __name__ == '__main__':
     gan = GAN(rows=100)
-    gan.train(epochs=500, batch_size=32, sample_interval=2, update_plot_interval=2, repetition_disc=1, repetition_gen=1)
+    # Set number of epochs here!
+    gan.train(epochs=1, batch_size=32, sample_interval=2, update_plot_interval=2, repetition_disc=1, repetition_gen=1)
